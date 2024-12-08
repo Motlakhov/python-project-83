@@ -7,15 +7,15 @@ dev:
 	poetry run flask --app page_analyzer:app run
 
 build:
-    make install
-    ./build.sh
+	make install
+	./build.sh
 
 publish:
 	poetry publish --dry-run
 
 package-install:
 	poetry build
-    python3 -m pip install dist/*.whl
+	python3 -m pip install dist/*.whl
 
 lint:
 	poetry run flake8
