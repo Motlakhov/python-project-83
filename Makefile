@@ -6,8 +6,6 @@ install:
 dev:
 	poetry run flask --app page_analyzer:app run
 
-.PHONY: build
-
 build:
     make install
     ./build.sh
