@@ -36,3 +36,15 @@ ALTER SEQUENCE public.urls_id_seq OWNED BY public.urls.id;
 -- Добавляем уникальный индекс на поле name
 CREATE UNIQUE INDEX IF NOT EXISTS urls_name_key ON public.urls(name);
 
+
+-- Таблица проверок
+CREATE TABLE IF NOT EXISTS public.url_checks (
+    id SERIAL PRIMARY KEY, 
+    url_id bigint REFERENCES public.urls(id), 
+    status_code bigint, 
+    h1 VARCHAR(255), 
+    title VARCHAR(255), 
+    description VARCHAR(255), 
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
