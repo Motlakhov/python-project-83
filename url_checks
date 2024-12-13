@@ -1,0 +1,145 @@
+\du
+\q
+SELECT * FROM users
+SELECT * FROM users;
+SELECT * FROM users;
+SELECT * FROM hexlet;
+\d
+SELECT * FROM users_id_seq;
+SELECT * FROM users;
+\l
+SELECT * FROM users;
+SELECT * FROM hexlet
+SELECT * FROM hexlet;
+SELECT * FROM hexlet;
+SELECT * FROM hexlet;
+SELECT * FROM users;
+DELETE * FROM users;
+DELETE * FROM users;
+DELETE username, phone FROM users;
+DELETE * FROM users;
+DELETE FROM users WHERE name='tommy';
+DELETE FROM users WHERE username='tommy';
+\l
+SELECT * FROM users;
+DELETE FROM users WHERE username='jim';
+SELECT * FROM users;
+SELECT * FROM users;
+SELECT * FROM users;
+l
+\l
+SELECT * FROM users
+;
+SELECT * FROM users;
+SELECT * FROM users;
+SELECT * FROM users;
+SELECT * FROM users;
+/dt
+/dt
+/d
+/l
+\dt
+\l
+CREATE TABLE urls (
+id SERIAL PRIMARY KEY
+name VARCHAR(255) UNIQUE
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE urls (id SERIAL PRIMARY KEY, name VARCHAR(255) UNIQUE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+\q
+\i /page_analyzer/database.sql
+\i page_analyzer/database.sql
+\q
+CREATE ROLE mota LOGIN PASSWORD 'erozadit56';
+GRANT ALL PRIVILEGES ON DATABASE render_pages TO mota;
+\i page_analyzer/database.sql
+DROP TABLE IF EXISTS urls CASCADE;
+DROP SEQUENCE IF EXISTS urls_id_seq CASCADE;
+\i page_analyzer/database.sql
+CREATE TABLE IF NOT EXISTS urls (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE SEQUENCE IF NOT EXISTS urls_id_seq;
+\q
+DROP TABLE IF EXISTS urls CASCADE;
+DROP SEQUENCE IF EXISTS urls_id_seq CASCADE;
+\i page_analyzer/database.sql
+\q
+\q
+ALTER TABLE urls ALTER COLUMN id TYPE varchar(50);
+\q
+SELECT id FROM urls
+\d urls
+ALTER TABLE urls ALTER COLUMN id SET DATA TYPE SERIAL;
+ALTER TABLE urls ALTER COLUMN id SET DATA TYPE SERIAL;
+ALTER TABLE urls ALTER COLUMN id TYPE bigint USING id::bigint;
+DROP TABLE urls;
+CREATE TABLE urls (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+\й
+\q
+\q
+CREATE TABLE IF NOT EXISTS pblic.url_checks (
+    id SERIAL PRIMARY KEY, 
+    url_id bigint REFERENCES public.urls(id), 
+    status_code bigint, 
+    h1 VARCHAR(255), 
+    title VARCHAR(255), 
+    description VARCHAR(255), 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS public.url_checks (
+    id SERIAL PRIMARY KEY, 
+    url_id bigint REFERENCES public.urls(id), 
+    status_code bigint, 
+    h1 VARCHAR(255), 
+    title VARCHAR(255), 
+    description VARCHAR(255), 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+\q
+DROP TABLE IF EXISTS url_checks;
+CREATE TABLE url_checks (
+    id SERIAL PRIMARY KEY,
+    url_id INT,
+    status_code INT,
+    h1 VARCHAR(255),
+    title VARCHAR(255),
+    description VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+\q
+\в url_checks
+\d url_checks
+\q
+\d urls
+SELECT created_at FROM urls WHERE id = 9;
+\q
+\d url_checks
+\d urls
+ALTER TABLE urls;
+ALTER TABLE urls
+ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+\d urls
+ALTER TABLE urls
+ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+\d urls
+\q
+DELETE FROM urls;
+DELETE FROM url_checks;
+\q
+DELETE FROM urls;
+DELETE FROM url_checks;
+ALTER SEQUENCE urls_id_seq RESTART WITH 1;
+\q
+DELETE FROM urls;
+DELETE FROM url_checks;
+ALTER SEQUENCE urls_id_seq RESTART WITH 1;
+ALTER SEQUENCE url_checks_id_seq RESTART WITH 1;
+\q
+\s url_checks

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, flash, request, redirect, url_for
+from flask import Flask, render_template, flash, request, redirect, url_for, get_flashed_messages
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 import psycopg2
@@ -7,6 +7,8 @@ import os
 import uuid
 from validators import url as valid_url
 from datetime import datetime
+import requests
+from requests import RequestException
 
 
 load_dotenv()
@@ -22,7 +24,6 @@ def create_app():
     def index():
         if request.method == 'POST':
             url = request.form.get('url')
-            created_at = request.form.get('created_at')
 
             parsed_url = urlparse(url)
             normalized_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
@@ -38,7 +39,7 @@ def create_app():
             # Валидация URL
             if not valid_url(url):
                 flash('Некорректный URL', 'error')
-                return redirect(url_for('index'))
+                return redirect(url_for('urls'))  # Переходим на /urls с сохраненной ошибкой
 
             # Проверка существования URL в базе данных
             with conn.cursor() as cur:
@@ -61,8 +62,29 @@ def create_app():
 
     @app.route('/urls', methods=['GET'])
     def urls():
+        messages = get_flashed_messages(with_categories=True)
+        show_error_message = any(category == 'error' for category, _ in messages)
+
+        if show_error_message:
+            return render_template('index.html')
+
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(""" SELECT u.id, u.name, MAX(c.created_at) AS last_check FROM urls u LEFT JOIN url_checks c ON u.id = c.url_id GROUP BY u.id, u.name ORDER BY u.created_at DESC; """)
+            cur.execute(""" SELECT
+                                u.id,
+                                u.name,
+                                uc.created_at AS last_check,
+                                uc.status_code
+                            FROM urls u
+                            JOIN LATERAL (
+                                SELECT
+                                    uc.created_at,
+                                    uc.status_code
+                                FROM url_checks uc
+                                WHERE uc.url_id = u.id
+                                ORDER BY uc.created_at DESC
+                                LIMIT 1
+                            ) uc ON true
+                            ORDER BY u.created_at DESC; """)
             urls = cur.fetchall()
 
             for url in urls:
@@ -102,26 +124,36 @@ def create_app():
 
         return render_template('url_detail.html', url=url_data, checks=checks)
     
+
     @app.route('/urls/<int:id>/checks', methods=['POST'])
     def add_check(id):
         # Проверяем существование URL
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
-            url = cur.fetchone()
-        if not url:
+            url_data = cur.fetchone()
+        
+        if not url_data:
             flash('Запись не найдена.', 'error')
             return redirect(url_for('urls'))
+        
+        try:
+            response = requests.get(url_data['name'], timeout=5)
+            response.raise_for_status()  # Если сайт недоступен, вызывается исключение
+            status_code = response.status_code
+        except RequestException as e:
+            flash(f"Произошла ошибка при проверке: {e}", 'error')
+            return redirect(url_for('url_detail', id=id))
 
         # Создаем новую запись в таблице url_checks
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO url_checks (url_id, created_at) VALUES (%s, %s)",
-                (id, datetime.now())
+                "INSERT INTO url_checks (url_id, status_code, created_at) VALUES (%s, %s, %s)",
+                (id, status_code, datetime.now())
             )
             conn.commit()
 
         flash('Проверка запущена', 'success')
-        return redirect(url_for('url_detail', id=id))
+        return redirect(url_for('url_detail', id=id, status_code=status_code))
 
     return app
 
