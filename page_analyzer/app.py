@@ -9,6 +9,7 @@ from validators import url as valid_url
 from datetime import datetime
 import requests
 from requests import RequestException
+from bs4 import BeautifulSoup
 
 
 load_dotenv()
@@ -51,12 +52,13 @@ def create_app():
 
             # Добавление нового URL в базу данных
             with conn.cursor() as cur:
-                cur.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s)",
+                cur.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
                             (normalized_url, datetime.now()))
+                new_site_id = cur.fetchone()[0]
                 conn.commit()
-
-            flash('URL успешно добавлен.', 'success')
-            return redirect(url_for('urls'))
+            
+            flash('Страница успешно добавлена', 'success')
+            return redirect(url_for('url_detail', id=new_site_id))
 
         return render_template('index.html')
 
@@ -69,29 +71,32 @@ def create_app():
             return render_template('index.html')
 
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(""" SELECT
-                                u.id,
-                                u.name,
-                                uc.created_at AS last_check,
-                                uc.status_code
-                            FROM urls u
-                            JOIN LATERAL (
-                                SELECT
+            cur.execute(""" WITH latest_checks AS (
+                                SELECT DISTINCT ON (uc.url_id)
+                                    uc.url_id,
                                     uc.created_at,
                                     uc.status_code
                                 FROM url_checks uc
-                                WHERE uc.url_id = u.id
-                                ORDER BY uc.created_at DESC
-                                LIMIT 1
-                            ) uc ON true
+                                ORDER BY uc.url_id, uc.created_at DESC
+                            )
+                            SELECT
+                                u.id,
+                                u.name,
+                                lc.created_at AS last_check,
+                                lc.status_code
+                            FROM urls u
+                            LEFT JOIN latest_checks lc ON u.id = lc.url_id
                             ORDER BY u.created_at DESC; """)
             urls = cur.fetchall()
 
+            # Конвертируем полученный словарь в список
+            urls_list = []
             for url in urls:
                 if url['last_check']:
                     url['last_check_formatted'] = url['last_check'].strftime('%Y-%m-%d')
+                urls_list.append(url)
 
-        return render_template('urls.html', urls=urls)
+        return render_template('urls.html', urls=urls_list)
 
     @app.route('/urls/<int:id>', methods=['GET'])
     def url_detail(id):
@@ -143,12 +148,33 @@ def create_app():
         except RequestException as e:
             flash(f"Произошла ошибка при проверке: {e}", 'error')
             return redirect(url_for('url_detail', id=id))
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        # Инициализируем переменные для хранения результатов анализа
+        h1_tag_content = ''
+        title_tag_content = ''
+        meta_description_content = ''
 
-        # Создаем новую запись в таблице url_checks
+        # Поиск тега <h1>
+        h1_tag = soup.find('h1')
+        if h1_tag is not None:
+            h1_tag_content = h1_tag.text.strip()
+
+        # Поиск тега <title>
+        title_tag = soup.title
+        if title_tag is not None:
+            title_tag_content = title_tag.text.strip()
+
+        # Поиск тега <meta name="description">
+        meta_description_tag = soup.find('meta', attrs={'name': 'description'})
+        if meta_description_tag is not None:
+            meta_description_content = meta_description_tag.get('content').strip()
+
+        # Записываем результаты анализа в базу данных
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO url_checks (url_id, status_code, created_at) VALUES (%s, %s, %s)",
-                (id, status_code, datetime.now())
+                """ INSERT INTO url_checks (url_id, status_code, created_at, h1, title, description) VALUES (%s, %s, %s, %s, %s, %s) """,
+                (id, status_code, datetime.now(), h1_tag_content, title_tag_content, meta_description_content)
             )
             conn.commit()
 
