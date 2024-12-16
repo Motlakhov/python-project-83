@@ -8,7 +8,7 @@ import uuid
 from validators import url as valid_url
 from datetime import datetime
 import requests
-from requests import RequestException, HTTPError
+from requests import RequestException, HTTPError, Timeout
 from bs4 import BeautifulSoup
 
 
@@ -16,6 +16,7 @@ load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
 # conn = psycopg2.connect(DATABASE_URL)
 # cur = conn.cursor()
+
 
 def create_app():
     app = Flask(__name__)
@@ -69,7 +70,7 @@ def create_app():
         show_error_message = any(category == 'error' for category, _ in messages)
 
         if show_error_message:
-            return render_template('index.html'), 400
+            return render_template('index.html')
 
         with psycopg2.connect(DATABASE_URL) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -98,7 +99,7 @@ def create_app():
                         url['last_check_formatted'] = url['last_check'].strftime('%Y-%m-%d')
                     urls_list.append(url)
 
-        return render_template('urls.html', urls=urls_list), 200
+        return render_template('urls.html', urls=urls_list)
 
     @app.route('/urls/<int:id>', methods=['GET'])
     def url_detail(id):
@@ -111,7 +112,7 @@ def create_app():
 
                     if not url_data:
                         flash('Запись не найдена.', 'error')
-                        return redirect(url_for('urls')), 404
+                        return redirect(url_for('urls'))
 
         # Получаем список проверок для данного URL
                     cur.execute("SELECT * FROM url_checks WHERE url_id = %s ORDER BY created_at DESC", (id,))
@@ -141,48 +142,48 @@ def create_app():
         
                 if not url_data:
                     flash('Запись не найдена.', 'error')
-                    return redirect(url_for('urls')), 404
+                    return redirect(url_for('urls'))
         
-                try:
-                    response = requests.get(url_data['name'], timeout=5)
-                    response.raise_for_status()  # Если сайт недоступен, вызывается исключение
-                    status_code = response.status_code
-                    session['last_status_code'] = status_code
-                except RequestException:
-                    flash(f"Произошла ошибка при проверке", 'error')
-                    return redirect(url_for('url_detail', id=id)), 500
+        try:
+            response = requests.get(url_data['name'], timeout=8)
+            response.raise_for_status()  # Если сайт недоступен, вызывается исключение
+            status_code = response.status_code
+            session['last_status_code'] = status_code
+        except RequestException:
+            flash(f"Произошла ошибка при проверке", 'error')
+            return redirect(url_for('url_detail', id=id))
         
-                soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.text, 'html.parser')
         # Инициализируем переменные для хранения результатов анализа
-                h1_tag_content = ''
-                title_tag_content = ''
-                meta_description_content = ''
+        h1_tag_content = ''
+        title_tag_content = ''
+        meta_description_content = ''
 
         # Поиск тега <h1>
-                h1_tag = soup.find('h1')
-                if h1_tag is not None:
-                    h1_tag_content = h1_tag.text.strip()
+        h1_tag = soup.find('h1')
+        if h1_tag is not None:
+            h1_tag_content = h1_tag.text.strip()[:255]
 
         # Поиск тега <title>
-                title_tag = soup.title
-                if title_tag is not None:
-                    title_tag_content = title_tag.text.strip()
+        title_tag = soup.title
+        if title_tag is not None:
+            title_tag_content = title_tag.text.strip()[:255]
 
         # Поиск тега <meta name="description">
-                meta_description_tag = soup.find('meta', attrs={'name': 'description'})
-                if meta_description_tag is not None:
-                    meta_description_content = meta_description_tag.get('content').strip()
+        meta_description_tag = soup.find('meta', attrs={'name': 'description'})
+        if meta_description_tag is not None:
+            meta_description_content = meta_description_tag.get('content').strip()[:255]
 
         # Записываем результаты анализа в базу данных
-                with conn.cursor() as cur:
-                    cur.execute(
+        with conn.cursor() as cur:
+            cur.execute(
                 """ INSERT INTO url_checks (url_id, status_code, created_at, h1, title, description) VALUES (%s, %s, %s, %s, %s, %s) """,
                 (id, status_code, datetime.now(), h1_tag_content, title_tag_content, meta_description_content)
             )
-                    conn.commit()
+            conn.commit()
 
-                    flash('Страница успешно проверена', 'success')
-                    return redirect(url_for('url_detail', id=id)), 200
+        flash('Страница успешно проверена', 'success')
+        return redirect(url_for('url_detail', id=id))
 
     return app
 
