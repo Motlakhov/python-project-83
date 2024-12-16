@@ -1,4 +1,4 @@
-from flask import Flask, render_template, flash, request, redirect, url_for, get_flashed_messages
+from flask import Flask, render_template, flash, request, redirect, url_for, get_flashed_messages, session
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 import psycopg2
@@ -47,7 +47,7 @@ def create_app():
                 cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
                 existing_url = cur.fetchone()
             if existing_url:
-                flash('Страница уже существует.', 'warning')
+                flash('Страница уже существует', 'info')
                 return redirect(url_for('index'))
 
             # Добавление нового URL в базу данных
@@ -145,6 +145,7 @@ def create_app():
             response = requests.get(url_data['name'], timeout=5)
             response.raise_for_status()  # Если сайт недоступен, вызывается исключение
             status_code = response.status_code
+            session['last_status_code'] = status_code
         except RequestException:
             flash(f"Произошла ошибка при проверке", 'error')
             return redirect(url_for('url_detail', id=id))
@@ -179,7 +180,7 @@ def create_app():
             conn.commit()
 
         flash('Страница успешно проверена', 'success')
-        return redirect(url_for('url_detail', id=id, status_code=status_code))
+        return redirect(url_for('url_detail', id=id))
 
     return app
 

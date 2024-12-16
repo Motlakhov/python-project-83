@@ -70,7 +70,7 @@
   {% for check in checks %}
   <tr>
       <td>{{ check.id }}</td>
-      <td>{{ check.status_code }}</td>
+      <td>{{ session.get('last_status_code', '') }}</td>
       <td>{{ check.h1 }}</td>
       <td>{{ check.title }}</td>
       <td>{{ check.description }}</td>
