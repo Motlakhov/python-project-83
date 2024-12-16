@@ -1,4 +1,4 @@
-from flask import Flask, render_template, flash, request, redirect, url_for, get_flashed_messages, session
+from flask import Flask, render_template, flash, request, redirect, url_for, get_flashed_messages, session, make_response
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 import psycopg2
@@ -41,6 +41,8 @@ def create_app():
             # Валидация URL
             if not valid_url(url):
                 flash('Некорректный URL', 'error')
+                response = make_response(redirect(url_for('urls')))
+                response.status_code = 422
                 return redirect(url_for('urls'))  # Переходим на /urls с сохраненной ошибкой
 
             # Проверка существования URL в базе данных
@@ -48,9 +50,9 @@ def create_app():
                 with conn.cursor() as cur:
                     cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
                     existing_url = cur.fetchone()
-                if existing_url:
-                    flash('Страница уже существует', 'info')
-                    return redirect(url_for('index'))
+                    if existing_url:
+                        flash('Страница уже существует', 'info')
+                        return redirect(url_for('url_detail', id=existing_url[0]))
 
             # Добавление нового URL в базу данных
                 with conn.cursor() as cur:
@@ -145,7 +147,7 @@ def create_app():
                     return redirect(url_for('urls'))
         
         try:
-            response = requests.get(url_data['name'], timeout=8)
+            response = requests.get(url_data['name'], timeout=15)
             response.raise_for_status()  # Если сайт недоступен, вызывается исключение
             status_code = response.status_code
             session['last_status_code'] = status_code
