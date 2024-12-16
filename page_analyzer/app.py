@@ -145,8 +145,8 @@ def create_app():
             response = requests.get(url_data['name'], timeout=5)
             response.raise_for_status()  # Если сайт недоступен, вызывается исключение
             status_code = response.status_code
-        except RequestException as e:
-            flash(f"Произошла ошибка при проверке: {e}", 'error')
+        except RequestException:
+            flash(f"Произошла ошибка при проверке", 'error')
             return redirect(url_for('url_detail', id=id))
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -178,7 +178,7 @@ def create_app():
             )
             conn.commit()
 
-        flash('Проверка запущена', 'success')
+        flash('Страница успешно проверена', 'success')
         return redirect(url_for('url_detail', id=id, status_code=status_code))
 
     return app
