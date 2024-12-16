@@ -41,9 +41,7 @@ def create_app():
             # Валидация URL
             if not valid_url(url):
                 flash('Некорректный URL', 'error')
-                response = make_response(redirect(url_for('urls')))
-                response.status_code = 422
-                return redirect(url_for('urls'))  # Переходим на /urls с сохраненной ошибкой
+                return make_response('', 422)  # Переходим на /urls с сохраненной ошибкой
 
             # Проверка существования URL в базе данных
             with psycopg2.connect(DATABASE_URL) as conn:
