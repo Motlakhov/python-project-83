@@ -8,7 +8,7 @@ import uuid
 from validators import url as valid_url
 from datetime import datetime
 import requests
-from requests import RequestException
+from requests import RequestException, HTTPError
 from bs4 import BeautifulSoup
 
 
@@ -69,7 +69,7 @@ def create_app():
         show_error_message = any(category == 'error' for category, _ in messages)
 
         if show_error_message:
-            return render_template('index.html')
+            return render_template('index.html'), 400
 
         with psycopg2.connect(DATABASE_URL) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -98,7 +98,7 @@ def create_app():
                         url['last_check_formatted'] = url['last_check'].strftime('%Y-%m-%d')
                     urls_list.append(url)
 
-        return render_template('urls.html', urls=urls_list)
+        return render_template('urls.html', urls=urls_list), 200
 
     @app.route('/urls/<int:id>', methods=['GET'])
     def url_detail(id):
@@ -111,7 +111,7 @@ def create_app():
 
                     if not url_data:
                         flash('Запись не найдена.', 'error')
-                        return redirect(url_for('urls'))
+                        return redirect(url_for('urls')), 404
 
         # Получаем список проверок для данного URL
                     cur.execute("SELECT * FROM url_checks WHERE url_id = %s ORDER BY created_at DESC", (id,))
@@ -141,7 +141,7 @@ def create_app():
         
                 if not url_data:
                     flash('Запись не найдена.', 'error')
-                    return redirect(url_for('urls'))
+                    return redirect(url_for('urls')), 404
         
                 try:
                     response = requests.get(url_data['name'], timeout=5)
@@ -150,7 +150,7 @@ def create_app():
                     session['last_status_code'] = status_code
                 except RequestException:
                     flash(f"Произошла ошибка при проверке", 'error')
-                    return redirect(url_for('url_detail', id=id))
+                    return redirect(url_for('url_detail', id=id)), 500
         
                 soup = BeautifulSoup(response.text, 'html.parser')
         # Инициализируем переменные для хранения результатов анализа
@@ -182,7 +182,7 @@ def create_app():
                     conn.commit()
 
                     flash('Страница успешно проверена', 'success')
-                    return redirect(url_for('url_detail', id=id))
+                    return redirect(url_for('url_detail', id=id)), 200
 
     return app
 
