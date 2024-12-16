@@ -7,7 +7,6 @@ dev:
 	poetry run flask --app page_analyzer:app run
 
 build:
-	make install
 	./build.sh
 
 publish:
