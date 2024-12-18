@@ -44,7 +44,6 @@ def create_app():
                 return make_response('', 422)  # Переходим на /urls с сохраненной ошибкой
 
             # Проверка существования URL в базе данных
-           
             cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
             existing_url = cur.fetchone()
             if existing_url:
