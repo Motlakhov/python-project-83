@@ -182,8 +182,5 @@ def create_app():
     
     return app
 
-cur.close()
-conn.close()
-
 app = create_app()
 
