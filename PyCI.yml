@@ -20,13 +20,19 @@ jobs:
         run: |
           pip install poetry
           make install
+      - name: Create directories for artifacts
+        run: |
+          mkdir -p test_results screenshots
+      - name: Run tests
+        run: |
+          pytest --junitxml=test_results/junit.xml
       - name: Upload Test Results
         uses: actions/upload-artifact@v3
         with:
           name: test-results
-          path: ./path/to/test_results/
+          path: test_results/
       - name: Upload Screenshots
         uses: actions/upload-artifact@v3
         with:
           name: screenshots
-          path: ./path/to/screenshots/
+          path: screenshots/
