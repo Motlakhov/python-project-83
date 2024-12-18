@@ -91,7 +91,7 @@ def create_app():
                             ORDER BY u.created_at DESC; """)
         urls = cur.fetchall()
 
-            # Конвертируем полученный словарь в список
+        # Конвертируем полученный словарь в список
         urls_list = []
         for url in urls:
             if url['last_check']:
