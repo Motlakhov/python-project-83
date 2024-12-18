@@ -44,8 +44,8 @@
           <td>{{ url.last_check_formatted }}</td>
           <td>{% if url.status_code %}{{ url.status_code }}{% else %}-{% endif %}</td>
           {% else %}
-          <td>-</td>
-          <td>-</td>
+          <td></td>
+          <td></td>
           {% endif %}
         </tr>
         {% endfor %}
