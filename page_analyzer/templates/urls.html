@@ -36,19 +36,14 @@
     </thead>
     <tbody>
 
-        {% for url in urls %}
-        <tr>
-          <td>{{ url.id }}</td>
-          <td><a href="{{ url_for('url_detail', id=url.id) }}">{{ url.name }}</a></td>
-          {% if url.last_check %}
-          <td>{{ url.last_check_formatted }}</td>
-          <td>{% if url.status_code %}{{ url.status_code }}{% else %}-{% endif %}</td>
-          {% else %}
-          <td></td>
-          <td></td>
-          {% endif %}
-        </tr>
-        {% endfor %}
+      {% for url in urls %}
+      <tr>
+        <td>{{ url.id }}</td>
+        <td><a href="{{ url_for('url_detail', id=url.id) }}">{{ url.name }}</a></td>
+        <td>{% if url.last_check %}{{ url.last_check_formatted }}{% else %}-{% endif %}</td>
+        <td>{% if url.status_code %}{{ url.status_code }}{% else %}-{% endif %}</td>
+      </tr>
+      {% endfor %}
 
     </tbody>
   </table>
