@@ -4,18 +4,18 @@ from urllib.parse import urlparse
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
-import uuid
 from validators import url as valid_url
 from datetime import datetime
 import requests
-from requests import RequestException, HTTPError, Timeout
+from requests import RequestException
 from bs4 import BeautifulSoup
 
 
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
-# conn = psycopg2.connect(DATABASE_URL)
-# cur = conn.cursor()
+
+conn = psycopg2.connect(DATABASE_URL)
+cur = conn.cursor(cursor_factory=RealDictCursor)
 
 
 def create_app():
@@ -44,37 +44,36 @@ def create_app():
                 return make_response('', 422)  # Переходим на /urls с сохраненной ошибкой
 
             # Проверка существования URL в базе данных
-            with psycopg2.connect(DATABASE_URL) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
-                    existing_url = cur.fetchone()
-                    if existing_url:
-                        flash('Страница уже существует', 'info')
-                        return redirect(url_for('url_detail', id=existing_url[0]))
+           
+            cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
+            existing_url = cur.fetchone()
+            if existing_url:
+                flash('Страница уже существует', 'info')
+                return redirect(url_for('url_detail', id=existing_url['id']))
 
             # Добавление нового URL в базу данных
-                with conn.cursor() as cur:
-                    cur.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
-                                (normalized_url, datetime.now()))
-                    new_site_id = cur.fetchone()[0]
-                    conn.commit()
+                
+            cur.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
+                        (normalized_url, datetime.now()))
+            new_site_id = cur.fetchone()['id']
+            conn.commit()
             
-                    flash('Страница успешно добавлена', 'success')
-                    return redirect(url_for('url_detail', id=new_site_id))
+            flash('Страница успешно добавлена', 'success')
+            return redirect(url_for('url_detail', id=new_site_id))
 
         return render_template('index.html')
 
     @app.route('/urls', methods=['GET'])
     def urls():
+
         messages = get_flashed_messages(with_categories=True)
         show_error_message = any(category == 'error' for category, _ in messages)
 
         if show_error_message:
             return render_template('index.html')
 
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(""" WITH latest_checks AS (
+        
+        cur.execute(""" WITH latest_checks AS (
                                 SELECT DISTINCT ON (uc.url_id)
                                     uc.url_id,
                                     uc.created_at,
@@ -90,62 +89,59 @@ def create_app():
                             FROM urls u
                             LEFT JOIN latest_checks lc ON u.id = lc.url_id
                             ORDER BY u.created_at DESC; """)
-                urls = cur.fetchall()
+        urls = cur.fetchall()
 
             # Конвертируем полученный словарь в список
-                urls_list = []
-                for url in urls:
-                    if url['last_check']:
-                        url['last_check_formatted'] = url['last_check'].strftime('%Y-%m-%d')
-                    urls_list.append(url)
+        urls_list = []
+        for url in urls:
+            if url['last_check']:
+                url['last_check_formatted'] = url['last_check'].strftime('%Y-%m-%d')
+            urls_list.append(url)
+
 
         return render_template('urls.html', urls=urls_list)
 
     @app.route('/urls/<int:id>', methods=['GET'])
     def url_detail(id):
-        try:
-            with psycopg2.connect(DATABASE_URL) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Получаем информацию о конкретном URL
-                    cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
-                    url_data = cur.fetchone()
 
-                    if not url_data:
-                        flash('Запись не найдена.', 'error')
-                        return redirect(url_for('urls'))
+        # Получаем информацию о конкретном URL
+        cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
+        url_data = cur.fetchone()
+
+        if not url_data:
+            flash('Запись не найдена.', 'error')
+            return redirect(url_for('urls'))
 
         # Получаем список проверок для данного URL
-                    cur.execute("SELECT * FROM url_checks WHERE url_id = %s ORDER BY created_at DESC", (id,))
-                    checks = cur.fetchall()
+        cur.execute("SELECT * FROM url_checks WHERE url_id = %s ORDER BY created_at DESC", (id,))
+        checks = cur.fetchall()
 
-                    for check in checks:
+        for check in checks:
         # Преобразуем строку с датой в объект datetime
-                        check['created_at_formatted'] = check['created_at'].strftime('%Y-%m-%d')  # Предположим, что строка имеет такой формат
+            check['created_at_formatted'] = check['created_at'].strftime('%Y-%m-%d')  # Предположим, что строка имеет такой формат
 
         # Аналогичная обработка для url_data
-                    if url_data and url_data['created_at']:
-                        url_data['created_at_formatted'] = url_data['created_at'].strftime('%Y-%m-%d')
+        if url_data and url_data['created_at']:
+            url_data['created_at_formatted'] = url_data['created_at'].strftime('%Y-%m-%d')
 
-                        return render_template('url_detail.html', url=url_data, checks=checks)
-        except psycopg2.Error as e:
-            flash(f'Произошла ошибка при взаимодействии с базой данных: {str(e)}', 'error')
-            return redirect(url_for('urls'))
+            return render_template('url_detail.html', url=url_data, checks=checks)
+
+        return redirect(url_for('urls'))
     
 
     @app.route('/urls/<int:id>/checks', methods=['POST'])
     def add_check(id):
-        # Проверяем существование URL
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
-                url_data = cur.fetchone()
         
-                if not url_data:
-                    flash('Запись не найдена.', 'error')
-                    return redirect(url_for('urls'))
+        # Проверяем существование URL
+        cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
+        url_data = cur.fetchone()
+        
+        if not url_data:
+            flash('Запись не найдена.', 'error')
+            return redirect(url_for('urls'))
         
         try:
-            response = requests.get(url_data['name'], timeout=15)
+            response = requests.get(url_data['name'])
             response.raise_for_status()  # Если сайт недоступен, вызывается исключение
             status_code = response.status_code
             session['last_status_code'] = status_code
@@ -175,12 +171,11 @@ def create_app():
             meta_description_content = meta_description_tag.get('content').strip()[:255]
 
         # Записываем результаты анализа в базу данных
-        with conn.cursor() as cur:
-            cur.execute(
-                """ INSERT INTO url_checks (url_id, status_code, created_at, h1, title, description) VALUES (%s, %s, %s, %s, %s, %s) """,
-                (id, status_code, datetime.now(), h1_tag_content, title_tag_content, meta_description_content)
-            )
-            conn.commit()
+        cur.execute(
+            """ INSERT INTO url_checks (url_id, status_code, created_at, h1, title, description) VALUES (%s, %s, %s, %s, %s, %s) """,
+            (id, status_code, datetime.now(), h1_tag_content, title_tag_content, meta_description_content)
+        )
+        conn.commit()
 
         flash('Страница успешно проверена', 'success')
         return redirect(url_for('url_detail', id=id))
@@ -189,6 +184,3 @@ def create_app():
 
 app = create_app()
 
-if __name__ == '__main__':
-    app.run(debug=True)
-    
