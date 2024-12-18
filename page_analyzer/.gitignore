@@ -9,4 +9,3 @@ coverage/
 coverage.xml
 test-coverage-tool
 htmlcov/
-.env
