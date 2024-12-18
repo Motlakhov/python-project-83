@@ -179,6 +179,9 @@ def create_app():
 
         flash('Страница успешно проверена', 'success')
         return redirect(url_for('url_detail', id=id))
+    
+    cur.close()
+    conn.close()
 
     return app
 
