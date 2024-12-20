@@ -9,6 +9,8 @@ from datetime import datetime
 import requests
 from requests import RequestException
 from bs4 import BeautifulSoup
+import cProfile
+import pstats
 
 
 load_dotenv()
@@ -21,6 +23,7 @@ cur = conn.cursor(cursor_factory=RealDictCursor)
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+
     
     @app.route('/', methods=['GET', 'POST'])
     def index():
@@ -72,22 +75,15 @@ def create_app():
             return render_template('index.html')
 
         
-        cur.execute(""" WITH latest_checks AS (
-                                SELECT DISTINCT ON (uc.url_id)
-                                    uc.url_id,
-                                    uc.created_at,
-                                    uc.status_code
-                                FROM url_checks uc
-                                ORDER BY uc.url_id, uc.created_at DESC
-                            )
-                            SELECT
-                                u.id,
-                                u.name,
-                                lc.created_at AS last_check,
-                                lc.status_code
-                            FROM urls u
-                            LEFT JOIN latest_checks lc ON u.id = lc.url_id
-                            ORDER BY u.created_at DESC; """)
+        cur.execute(""" SELECT
+                            u.id,
+                            u.name,
+                            MAX(uc.created_at) AS last_check,
+                            uc.status_code
+                        FROM urls u
+                        LEFT JOIN url_checks uc ON u.id = uc.url_id
+                        GROUP BY u.id, u.name, uc.status_code
+                        ORDER BY u.created_at DESC; """)
         urls = cur.fetchall()
 
         # Конвертируем полученный словарь в список
@@ -116,16 +112,15 @@ def create_app():
         checks = cur.fetchall()
 
         for check in checks:
-        # Преобразуем строку с датой в объект datetime
             check['created_at_formatted'] = check['created_at'].strftime('%Y-%m-%d')  # Предположим, что строка имеет такой формат
 
         # Аналогичная обработка для url_data
         if url_data and url_data['created_at']:
             url_data['created_at_formatted'] = url_data['created_at'].strftime('%Y-%m-%d')
 
-            return render_template('url_detail.html', url=url_data, checks=checks)
+        return render_template('url_detail.html', url=url_data, checks=checks)
 
-        return redirect(url_for('urls'))
+        # return redirect(url_for('urls'))
     
 
     @app.route('/urls/<int:id>/checks', methods=['POST'])
@@ -155,19 +150,13 @@ def create_app():
         meta_description_content = ''
 
         # Поиск тега <h1>
-        h1_tag = soup.find('h1')
-        if h1_tag is not None:
-            h1_tag_content = h1_tag.text.strip()[:255]
+        h1_tag_content = soup.h1.get_text(strip=True)[:255] if soup.h1 else ''
 
         # Поиск тега <title>
-        title_tag = soup.title
-        if title_tag is not None:
-            title_tag_content = title_tag.text.strip()[:255]
+        title_tag_content = soup.title.get_text(strip=True)[:255] if soup.title else ''
 
         # Поиск тега <meta name="description">
-        meta_description_tag = soup.find('meta', attrs={'name': 'description'})
-        if meta_description_tag is not None:
-            meta_description_content = meta_description_tag.get('content').strip()[:255]
+        meta_description_content = soup.find('meta', attrs={'name': 'description'}).get('content')[:255] if soup.find('meta', attrs={'name': 'description'}) else ''
 
         # Записываем результаты анализа в базу данных
         cur.execute(
@@ -183,3 +172,6 @@ def create_app():
 
 app = create_app()
 
+
+if __name__ == '__main__':
+    app.run(debug=True)

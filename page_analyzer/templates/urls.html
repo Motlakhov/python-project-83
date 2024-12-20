@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -29,22 +29,32 @@
 <div class="table-responsive">
   <table class="table table-bordered table-hover text-nowrap" data-test="urls">
     <thead>
-    <tr>
-      <th>ID</th>
-      <th>Имя</th>
-      <th>Последняя проверка</th>
-      <th>Код ответа</th>
-    </tr>
+      <tr>
+        <th>ID</th>
+        <th>Имя</th>
+        <th>Последняя проверка</th>
+        <th>Код ответа</th>
+      </tr>
     </thead>
     <tbody>
 
         {% for url in urls %}
         <tr>
           <td>{{ url.id }}</td>
-          <td><a href="{{ url_for('url_detail', id=url.id) }}">{{ url.name }}</a></td>
+          <td>
+            <a href="{{ url_for('url_detail', id=url.id) }}">{{ url.name }}</a>
+          </td>
           {% if url.last_check %}
-          <td>{{ url.last_check_formatted }}</td>
-          <td>{% if url.status_code %}{{ url.status_code }}{% else %}-{% endif %}</td>
+          <td>
+            {{ url.last_check_formatted }}
+          </td>
+          {% else %}
+          <td></td>
+          {% endif %}
+          {% if url.status_code %}
+          <td>
+            {{ url.status_code }}
+          </td>
           {% else %}
           <td></td>
           {% endif %}
