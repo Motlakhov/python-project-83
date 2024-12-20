@@ -83,7 +83,7 @@ def create_app():
                         FROM urls u
                         LEFT JOIN url_checks uc ON u.id = uc.url_id
                         GROUP BY u.id, u.name, uc.status_code
-                        ORDER BY u.created_at DESC; """)
+                        ORDER BY u.id DESC; """)
         urls = cur.fetchall()
 
         # Конвертируем полученный словарь в список
