@@ -44,7 +44,7 @@ def create_app():
             # Валидация URL
             if not valid_url(url):
                 flash('Некорректный URL', 'error')
-                return make_response('', 422)  # Переходим на /urls с сохраненной ошибкой
+                return render_template('index.html', url=url) 
 
             # Проверка существования URL в базе данных
             cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
