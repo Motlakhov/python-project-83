@@ -21,43 +21,45 @@ def create_app():
     return app
 
 app = create_app()
-    
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        url = request.form.get('url')
 
-        parsed_url = urlparse(url)
-        normalized_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-    
-        if len(url) > 255:
-            flash('Длина URL должна быть меньше 256 символов.', 'error')
-            return redirect(url_for('index'))
-
-        # Валидация URL
-        if not valid_url(url):
-            flash('Некорректный URL', 'error')
-            return render_template('index.html', url=url), 422 
-
-        # Проверка существования URL в базе данных
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
-                existing_url = cur.fetchone()
-                if existing_url:
-                    flash('Страница уже существует', 'info')
-                    return redirect(url_for('url_detail', id=existing_url['id']))
-                else:
-                    # Добавление нового URL в базу данных
-                    cur.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
-                                (normalized_url, datetime.now()))
-                    new_site_id = cur.fetchone()['id']
-                    conn.commit()
-            
-                    flash('Страница успешно добавлена', 'success')
-                    return redirect(url_for('url_detail', id=new_site_id))
-
+@app.route('/', methods=['GET'])
+def get_index():
     return render_template('index.html')
+    
+@app.route('/', methods=['POST'])
+def index():
+    url = request.form.get('url')
+
+    parsed_url = urlparse(url)
+    normalized_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    
+    if len(url) > 255:
+        flash('Длина URL должна быть меньше 256 символов.', 'error')
+        return redirect(url_for('index'))
+
+    # Валидация URL
+    if not valid_url(url):
+        flash('Некорректный URL', 'error')
+        return render_template('index.html', url=url), 422 
+
+    # Проверка существования URL в базе данных
+    with psycopg2.connect(DATABASE_URL) as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
+            existing_url = cur.fetchone()
+            if existing_url:
+                flash('Страница уже существует', 'info')
+                return redirect(url_for('url_detail', id=existing_url['id']))
+            else:
+                # Добавление нового URL в базу данных
+                cur.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
+                            (normalized_url, datetime.now()))
+                new_site_id = cur.fetchone()['id']
+                conn.commit()
+            
+                flash('Страница успешно добавлена', 'success')
+                return redirect(url_for('url_detail', id=new_site_id))
+
 
 @app.route('/urls', methods=['GET'])
 def urls():
