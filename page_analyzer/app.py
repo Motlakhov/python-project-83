@@ -38,7 +38,7 @@ def index():
         return redirect(url_for('index'))
 
     # Валидация URL
-    if not valid_url(url):
+    if not valid_url(normalized_url):
         flash('Некорректный URL', 'error')
         return render_template('index.html', url=url), 422 
 
