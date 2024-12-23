@@ -40,7 +40,7 @@ def index():
     # Валидация URL
     if not valid_url(url):
         flash('Некорректный URL', 'error')
-        return render_template('index.html', url=url), 422 
+        return redirect(url_for('urls'))
 
     # Проверка существования URL в базе данных
     with psycopg2.connect(DATABASE_URL) as conn:
@@ -59,6 +59,8 @@ def index():
             
                 flash('Страница успешно добавлена', 'success')
                 return redirect(url_for('url_detail', id=new_site_id))
+    return render_template('index.html')
+            
 
 
 @app.route('/urls', methods=['GET'])
