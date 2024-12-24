@@ -1,15 +1,16 @@
-from flask import Flask, render_template, flash, request, redirect, url_for, get_flashed_messages, session
-from dotenv import load_dotenv
-from urllib.parse import urlparse
-import psycopg2
-from psycopg2.extras import RealDictCursor
 import os
-from validators import url as valid_url
 from datetime import datetime
-import requests
-from requests import RequestException
-from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 
+import psycopg2
+import requests
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+from flask import (Flask, flash, get_flashed_messages, redirect,
+                   render_template, request, session, url_for)
+from psycopg2.extras import RealDictCursor
+from requests import RequestException
+from validators import url as valid_url
 
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -22,16 +23,16 @@ def create_app():
 
     return app
 
+
 app = create_app()
 
 
 @app.route('/', methods=['GET'])
-
 def index():
     return render_template('index.html')
 
-@app.route('/urls', methods=['POST'])
 
+@app.route('/urls', methods=['POST'])
 def post_index():
     url = request.form.get('url')
 
@@ -98,8 +99,8 @@ def urls():
         urls_list.append(url)
     return render_template('urls.html', urls=urls_list)
 
-@app.route('/urls/<int:id>', methods=['GET'])
 
+@app.route('/urls/<int:id>', methods=['GET'])
 def url_detail(id):         
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -118,17 +119,18 @@ def url_detail(id):
             checks = cur.fetchall()
 
             for check in checks:
-                check['created_at_formatted'] = check['created_at'].strftime('%Y-%m-%d')
+                check['created_at_formatted'] = \
+                    check['created_at'].strftime('%Y-%m-%d')
 
             # Аналогичная обработка для url_data
             if url_data and url_data['created_at']:
-                url_data['created_at_formatted'] = url_data['created_at'].strftime('%Y-%m-%d')
+                url_data['created_at_formatted'] = \
+                    url_data['created_at'].strftime('%Y-%m-%d')
 
     return render_template('url_detail.html', url=url_data, checks=checks)
 
 
 @app.route('/urls/<int:id>/checks', methods=['POST'])
-
 def add_check(id):
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:         
@@ -181,7 +183,8 @@ def add_check(id):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Записываем результаты анализа в базу данных
             cur.execute(
-                """ INSERT INTO url_checks (url_id, status_code, created_at, h1, title, description) 
+                """ INSERT INTO url_checks 
+                (url_id, status_code, created_at, h1, title, description) 
                 VALUES (%s, %s, %s, %s, %s, %s) """,
                 (
                     id, 
