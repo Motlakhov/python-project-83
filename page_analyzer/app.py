@@ -40,7 +40,7 @@ def post_index():
     # Валидация URL
     if not valid_url(url):
         flash('Некорректный URL', 'error')
-        return render_template('index.html')
+        return render_template('index.html'), 422
 
     # Проверка существования URL в базе данных
     with psycopg2.connect(DATABASE_URL) as conn:
