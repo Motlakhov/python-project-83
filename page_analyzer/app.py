@@ -23,11 +23,11 @@ def create_app():
 app = create_app()
 
 @app.route('/', methods=['GET'])
-def get_index():
+def index():
     return render_template('index.html')
     
-@app.route('/', methods=['POST'])
-def index():
+@app.route('/urls', methods=['POST'])
+def post_index():
     url = request.form.get('url')
 
     parsed_url = urlparse(url)
@@ -35,12 +35,12 @@ def index():
     
     if len(url) > 255:
         flash('Длина URL должна быть меньше 256 символов.', 'error')
-        return redirect(url_for('index'))
+        return render_template('index.html')
 
     # Валидация URL
     if not valid_url(url):
         flash('Некорректный URL', 'error')
-        return redirect(url_for('urls'))
+        return render_template('index.html')
 
     # Проверка существования URL в базе данных
     with psycopg2.connect(DATABASE_URL) as conn:
@@ -59,8 +59,6 @@ def index():
             
                 flash('Страница успешно добавлена', 'success')
                 return redirect(url_for('url_detail', id=new_site_id))
-    return render_template('index.html')
-            
 
 
 @app.route('/urls', methods=['GET'])
