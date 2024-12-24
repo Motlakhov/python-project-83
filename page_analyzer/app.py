@@ -1,4 +1,4 @@
-from flask import Flask, render_template, flash, request, redirect, url_for, get_flashed_messages, session, make_response
+from flask import Flask, render_template, flash, request, redirect, url_for, get_flashed_messages, session
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 import psycopg2
@@ -14,7 +14,9 @@ from bs4 import BeautifulSoup
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
 
+
 def create_app():
+
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
@@ -22,11 +24,14 @@ def create_app():
 
 app = create_app()
 
+
 @app.route('/', methods=['GET'])
+
 def index():
     return render_template('index.html')
-    
+
 @app.route('/urls', methods=['POST'])
+
 def post_index():
     url = request.form.get('url')
 
@@ -52,7 +57,9 @@ def post_index():
                 return redirect(url_for('url_detail', id=existing_url['id']))
             else:
                 # Добавление нового URL в базу данных
-                cur.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
+                cur.execute(""" INSERT INTO urls (name, created_at) 
+                            VALUES (%s, %s) 
+                            RETURNING id """,
                             (normalized_url, datetime.now()))
                 new_site_id = cur.fetchone()['id']
                 conn.commit()
@@ -71,17 +78,17 @@ def urls():
         return render_template('index.html')
 
     with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(""" SELECT
-                                    u.id,
-                                    u.name,
-                                    MAX(uc.created_at) AS last_check,
-                                    uc.status_code
-                                FROM urls u
-                                LEFT JOIN url_checks uc ON u.id = uc.url_id
-                                GROUP BY u.id, u.name, uc.status_code
-                                ORDER BY u.id DESC; """)
-                urls = cur.fetchall()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(""" SELECT
+                                u.id,
+                                u.name,
+                                MAX(uc.created_at) AS last_check,
+                                uc.status_code
+                            FROM urls u
+                            LEFT JOIN url_checks uc ON u.id = uc.url_id
+                            GROUP BY u.id, u.name, uc.status_code
+                            ORDER BY u.id DESC; """)
+            urls = cur.fetchall()
 
     # Конвертируем полученный словарь в список
     urls_list = []
@@ -89,57 +96,58 @@ def urls():
         if url['last_check']:
             url['last_check_formatted'] = url['last_check'].strftime('%Y-%m-%d')
         urls_list.append(url)
-
-
     return render_template('urls.html', urls=urls_list)
 
 @app.route('/urls/<int:id>', methods=['GET'])
+
 def url_detail(id):         
     with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Получаем информацию о конкретном URL
-                cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
-                url_data = cur.fetchone()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Получаем информацию о конкретном URL
+            cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
+            url_data = cur.fetchone()
 
-                if not url_data:
-                    flash('Запись не найдена.', 'error')
-                    return redirect(url_for('urls'))
+            if not url_data:
+                flash('Запись не найдена.', 'error')
+                return redirect(url_for('urls'))
 
-                # Получаем список проверок для данного URL
-                cur.execute("SELECT * FROM url_checks WHERE url_id = %s ORDER BY created_at DESC", (id,))
-                checks = cur.fetchall()
+            # Получаем список проверок для данного URL
+            cur.execute(""" SELECT * FROM url_checks 
+                        WHERE url_id = %s 
+                        ORDER BY created_at DESC """, (id,))
+            checks = cur.fetchall()
 
-                for check in checks:
-                    check['created_at_formatted'] = check['created_at'].strftime('%Y-%m-%d')  # Предположим, что строка имеет такой формат
+            for check in checks:
+                check['created_at_formatted'] = check['created_at'].strftime('%Y-%m-%d')
 
-                # Аналогичная обработка для url_data
-                if url_data and url_data['created_at']:
-                    url_data['created_at_formatted'] = url_data['created_at'].strftime('%Y-%m-%d')
+            # Аналогичная обработка для url_data
+            if url_data and url_data['created_at']:
+                url_data['created_at_formatted'] = url_data['created_at'].strftime('%Y-%m-%d')
 
     return render_template('url_detail.html', url=url_data, checks=checks)
 
-    
 
 @app.route('/urls/<int:id>/checks', methods=['POST'])
+
 def add_check(id):
     with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:         
-                # Проверяем существование URL
-                cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
-                url_data = cur.fetchone()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:         
+            # Проверяем существование URL
+            cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
+            url_data = cur.fetchone()
         
-                if not url_data:
-                    flash('Запись не найдена.', 'error')
-                    return redirect(url_for('urls'))
+            if not url_data:
+                flash('Запись не найдена.', 'error')
+                return redirect(url_for('urls'))
         
-                try:
-                    response = requests.get(url_data['name'])
-                    response.raise_for_status()  # Если сайт недоступен, вызывается исключение
-                    status_code = response.status_code
-                    session['last_status_code'] = status_code
-                except RequestException:
-                    flash(f"Произошла ошибка при проверке", 'error')
-                    return redirect(url_for('url_detail', id=id))
+            try:
+                response = requests.get(url_data['name'])
+                response.raise_for_status()  
+                status_code = response.status_code
+                session['last_status_code'] = status_code
+            except RequestException:
+                flash("Произошла ошибка при проверке", 'error')
+                return redirect(url_for('url_detail', id=id))
         
     soup = BeautifulSoup(response.text, 'html.parser')
     # Инициализируем переменные для хранения результатов анализа
@@ -148,22 +156,43 @@ def add_check(id):
     meta_description_content = ''
 
     # Поиск тега <h1>
-    h1_tag_content = soup.h1.get_text(strip=True)[:255] if soup.h1 else ''
+    h1_tag_content = (
+    soup.h1.get_text(strip=True)[:255]
+    if soup.h1
+    else ''
+)
 
     # Поиск тега <title>
-    title_tag_content = soup.title.get_text(strip=True)[:255] if soup.title else ''
+    title_tag_content = (
+    soup.title.get_text(strip=True)[:255]
+    if soup.title
+    else ''
+)
 
     # Поиск тега <meta name="description">
-    meta_description_content = soup.find('meta', attrs={'name': 'description'}).get('content')[:255] if soup.find('meta', attrs={'name': 'description'}) else ''
+    meta_description_content = (
+    soup.find('meta', attrs={'name': 'description'})
+    .get('content')[:255]
+    if soup.find('meta', attrs={'name': 'description'})
+    else ''
+)
 
     with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Записываем результаты анализа в базу данных
-                cur.execute(
-                    """ INSERT INTO url_checks (url_id, status_code, created_at, h1, title, description) VALUES (%s, %s, %s, %s, %s, %s) """,
-                    (id, status_code, datetime.now(), h1_tag_content, title_tag_content, meta_description_content)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Записываем результаты анализа в базу данных
+            cur.execute(
+                """ INSERT INTO url_checks (url_id, status_code, created_at, h1, title, description) 
+                VALUES (%s, %s, %s, %s, %s, %s) """,
+                (
+                    id, 
+                    status_code, 
+                    datetime.now(), 
+                    h1_tag_content, 
+                    title_tag_content, 
+                    meta_description_content
                 )
-                conn.commit()
+            )
+            conn.commit()
 
     flash('Страница успешно проверена', 'success')
     return redirect(url_for('url_detail', id=id))
