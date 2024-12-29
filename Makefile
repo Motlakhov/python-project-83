@@ -1,3 +1,4 @@
+PORT ?= 8080
 .PHONY: install dev build publish package-install start lint
 
 install:
@@ -17,8 +18,7 @@ package-install:
 	python3 -m pip install dist/*.whl
 
 lint:
-	poetry run flake8
+	poetry run flake8 page_analyzer
 
-PORT ?= 8080
 start:
 	poetry run gunicorn -w 5 -b 0.0.0.0:$(PORT) page_analyzer:app

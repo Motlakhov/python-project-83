@@ -1,30 +1,21 @@
 import os
-from datetime import datetime
-from urllib.parse import urlparse
-
-import psycopg2
 import requests
-from bs4 import BeautifulSoup
+from datetime import datetime
+from page_analyzer.utils import normalize_url, validate_url
+from page_analyzer.page_checker import extract_page_data
+from page_analyzer.db import get_url_by_name, insert_into_urls, get_all_urls, get_url_by_id, get_checks_for_url, insert_into_url_checks
 from dotenv import load_dotenv
 from flask import (Flask, flash, get_flashed_messages, redirect,
                    render_template, request, session, url_for)
-from psycopg2.extras import RealDictCursor
 from requests import RequestException
-from validators import url as valid_url
+
+
+app = Flask(__name__)
 
 load_dotenv()
-DATABASE_URL = os.getenv('DATABASE_URL')
 
-
-def create_app():
-
-    app = Flask(__name__)
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-
-    return app
-
-
-app = create_app()
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['DATABASE_URL'] = os.getenv('DATABASE_URL')
 
 
 @app.route('/', methods=['GET'])
@@ -36,37 +27,42 @@ def index():
 def post_index():
     url = request.form.get('url')
 
-    parsed_url = urlparse(url)
-    normalized_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-    
-    if len(url) > 255:
-        flash('Длина URL должна быть меньше 256 символов.', 'error')
-        return render_template('index.html')
+    normalized_url = normalize_url(url)
 
-    # Валидация URL
-    if not valid_url(url):
-        flash('Некорректный URL', 'error')
-        return render_template('index.html'), 422
+    validation_result = validate_url(url)
+
+    if validation_result is not None:
+        flash(validation_result, 'error')
+
+        if validation_result == 'Некорректный URL':
+            status_code = 422
+        else:
+            status_code = 400
+    
+        return render_template('index.html'), status_code
 
     # Проверка существования URL в базе данных
-    with psycopg2.connect(DATABASE_URL) as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT * FROM urls WHERE name = %s", (normalized_url,))
-            existing_url = cur.fetchone()
-            if existing_url:
-                flash('Страница уже существует', 'info')
-                return redirect(url_for('url_detail', id=existing_url['id']))
-            else:
-                # Добавление нового URL в базу данных
-                cur.execute(""" INSERT INTO urls (name, created_at) 
-                            VALUES (%s, %s) 
-                            RETURNING id """,
-                            (normalized_url, datetime.now()))
-                new_site_id = cur.fetchone()['id']
-                conn.commit()
+
+    existing_url = get_url_by_name(normalized_url)
+    if existing_url:
+        flash('Страница уже существует', 'info')
+        return redirect(url_for('url_detail', id=existing_url['id']))
+    else:
+        new_site_id = insert_into_urls(normalized_url, datetime.now()) 
+        flash('Страница успешно добавлена', 'success')
+        return redirect(url_for('url_detail', id=new_site_id))
             
-                flash('Страница успешно добавлена', 'success')
-                return redirect(url_for('url_detail', id=new_site_id))
+# Обработка ошибки 404 (страница не найдена)
+@app.errorhandler(404)
+def page_not_found(error):
+    flash('Запрошенная страница не найдена.', 'error')
+    return render_template('index.html'), 404
+
+# Обработка ошибки 500 (внутренняя ошибка сервера)
+@app.errorhandler(500)
+def internal_server_error(error):
+    flash('На сервере произошла ошибка. Попробуйте позже.', 'error')
+    return render_template('index.html'), 500
 
 
 @app.route('/urls', methods=['GET'])
@@ -78,18 +74,7 @@ def urls():
     if show_error_message:
         return render_template('index.html')
 
-    with psycopg2.connect(DATABASE_URL) as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(""" SELECT
-                                u.id,
-                                u.name,
-                                MAX(uc.created_at) AS last_check,
-                                uc.status_code
-                            FROM urls u
-                            LEFT JOIN url_checks uc ON u.id = uc.url_id
-                            GROUP BY u.id, u.name, uc.status_code
-                            ORDER BY u.id DESC; """)
-            urls = cur.fetchall()
+    urls = get_all_urls()
 
     # Конвертируем полученный словарь в список
     urls_list = []
@@ -101,101 +86,48 @@ def urls():
 
 
 @app.route('/urls/<int:id>', methods=['GET'])
-def url_detail(id):         
-    with psycopg2.connect(DATABASE_URL) as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Получаем информацию о конкретном URL
-            cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
-            url_data = cur.fetchone()
+def url_detail(id):
+    url_data = get_url_by_id(id)         
 
-            if not url_data:
-                flash('Запись не найдена.', 'error')
-                return redirect(url_for('urls'))
+    if not url_data:
+        flash('Запись не найдена.', 'error')
+        return redirect(url_for('urls'))
 
-            # Получаем список проверок для данного URL
-            cur.execute(""" SELECT * FROM url_checks 
-                        WHERE url_id = %s 
-                        ORDER BY created_at DESC """, (id,))
-            checks = cur.fetchall()
+    # Получаем список проверок для данного URL
+    checks = get_checks_for_url(id)
 
-            for check in checks:
-                check['created_at_formatted'] = \
-                    check['created_at'].strftime('%Y-%m-%d')
+    for check in checks:
+        check['created_at_formatted'] = \
+            check['created_at'].strftime('%Y-%m-%d')
 
-            # Аналогичная обработка для url_data
-            if url_data and url_data['created_at']:
-                url_data['created_at_formatted'] = \
-                    url_data['created_at'].strftime('%Y-%m-%d')
+    # Аналогичная обработка для url_data
+    if url_data and url_data['created_at']:
+        url_data['created_at_formatted'] = \
+            url_data['created_at'].strftime('%Y-%m-%d')
 
     return render_template('url_detail.html', url=url_data, checks=checks)
 
 
 @app.route('/urls/<int:id>/checks', methods=['POST'])
 def add_check(id):
-    with psycopg2.connect(DATABASE_URL) as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:         
-            # Проверяем существование URL
-            cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
-            url_data = cur.fetchone()
+    url_data = get_url_by_id(id)
         
-            if not url_data:
-                flash('Запись не найдена.', 'error')
-                return redirect(url_for('urls'))
+    if not url_data:
+        flash('Запись не найдена.', 'error')
+        return redirect(url_for('urls'))
         
-            try:
-                response = requests.get(url_data['name'])
-                response.raise_for_status()  
-                status_code = response.status_code
-                session['last_status_code'] = status_code
-            except RequestException:
-                flash("Произошла ошибка при проверке", 'error')
-                return redirect(url_for('url_detail', id=id))
-        
-    soup = BeautifulSoup(response.text, 'html.parser')
-    # Инициализируем переменные для хранения результатов анализа
-    h1_tag_content = ''
-    title_tag_content = ''
-    meta_description_content = ''
+    try:
+        response = requests.get(url_data['name'])
+        response.raise_for_status()  
+        status_code = response.status_code
+        session['last_status_code'] = status_code
+    except RequestException:
+        flash("Произошла ошибка при проверке", 'error')
+        return redirect(url_for('url_detail', id=id))
+    
+    page_data = extract_page_data(response)
 
-    # Поиск тега <h1>
-    h1_tag_content = (
-    soup.h1.get_text(strip=True)[:255]
-    if soup.h1
-    else ''
-)
-
-    # Поиск тега <title>
-    title_tag_content = (
-    soup.title.get_text(strip=True)[:255]
-    if soup.title
-    else ''
-)
-
-    # Поиск тега <meta name="description">
-    meta_description_content = (
-    soup.find('meta', attrs={'name': 'description'})
-    .get('content')[:255]
-    if soup.find('meta', attrs={'name': 'description'})
-    else ''
-)
-
-    with psycopg2.connect(DATABASE_URL) as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Записываем результаты анализа в базу данных
-            cur.execute(
-                """ INSERT INTO url_checks 
-                (url_id, status_code, created_at, h1, title, description) 
-                VALUES (%s, %s, %s, %s, %s, %s) """,
-                (
-                    id, 
-                    status_code, 
-                    datetime.now(), 
-                    h1_tag_content, 
-                    title_tag_content, 
-                    meta_description_content
-                )
-            )
-            conn.commit()
+    insert_into_url_checks(id, page_data)
 
     flash('Страница успешно проверена', 'success')
     return redirect(url_for('url_detail', id=id))

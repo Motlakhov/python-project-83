@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "hexlet-code"
 version = "0.1.0"
-description = ""
+description = "Page Analyzer – веб-приложение на Flask для анализа SEO-пригодности страниц, охватывающее основы бэкенд-разработки, работу с HTTP, роутинг, базы данных и деплой на Render.com."
 authors = ["Motlakhov <dmitrijmotlahov@gmail.com>"]
 readme = "README.md"
 package-mode = true
