@@ -3,7 +3,9 @@ import requests
 from datetime import datetime
 from page_analyzer.utils import normalize_url, validate_url
 from page_analyzer.page_checker import extract_page_data
-from page_analyzer.db import get_url_by_name, insert_into_urls, get_all_urls, get_url_by_id, get_checks_for_url, insert_into_url_checks
+from page_analyzer.db import (get_url_by_name, insert_into_urls, 
+                              get_all_urls, get_url_by_id, 
+                              get_checks_for_url, insert_into_url_checks)
 from dotenv import load_dotenv
 from flask import (Flask, flash, get_flashed_messages, redirect,
                    render_template, request, session, url_for)
@@ -51,12 +53,14 @@ def post_index():
         new_site_id = insert_into_urls(normalized_url, datetime.now()) 
         flash('Страница успешно добавлена', 'success')
         return redirect(url_for('url_detail', id=new_site_id))
-            
+
+
 # Обработка ошибки 404 (страница не найдена)
 @app.errorhandler(404)
 def page_not_found(error):
     flash('Запрошенная страница не найдена.', 'error')
     return render_template('index.html'), 404
+
 
 # Обработка ошибки 500 (внутренняя ошибка сервера)
 @app.errorhandler(500)
