@@ -3,8 +3,8 @@ import requests
 from datetime import datetime
 from page_analyzer.utils import normalize_url, validate_url
 from page_analyzer.page_checker import extract_page_data
-from page_analyzer.db import (get_url_by_name, insert_into_urls, 
-                              get_all_urls, get_url_by_id, 
+from page_analyzer.db import (get_url_by_name, insert_into_urls,
+                              get_all_urls, get_url_by_id,
                               get_checks_for_url, insert_into_url_checks)
 from dotenv import load_dotenv
 from flask import (Flask, flash, get_flashed_messages, redirect,
@@ -40,7 +40,7 @@ def post_index():
             status_code = 422
         else:
             status_code = 400
-    
+
         return render_template('index.html'), status_code
 
     # Проверка существования URL в базе данных
@@ -50,7 +50,7 @@ def post_index():
         flash('Страница уже существует', 'info')
         return redirect(url_for('url_detail', id=existing_url['id']))
     else:
-        new_site_id = insert_into_urls(normalized_url, datetime.now()) 
+        new_site_id = insert_into_urls(normalized_url, datetime.now())
         flash('Страница успешно добавлена', 'success')
         return redirect(url_for('url_detail', id=new_site_id))
 
@@ -84,14 +84,15 @@ def urls():
     urls_list = []
     for url in urls:
         if url['last_check']:
-            url['last_check_formatted'] = url['last_check'].strftime('%Y-%m-%d')
+            url['last_check_formatted'] = \
+                url['last_check'].strftime('%Y-%m-%d')
         urls_list.append(url)
     return render_template('urls.html', urls=urls_list)
 
 
 @app.route('/urls/<int:id>', methods=['GET'])
 def url_detail(id):
-    url_data = get_url_by_id(id)         
+    url_data = get_url_by_id(id)
 
     if not url_data:
         flash('Запись не найдена.', 'error')
@@ -115,20 +116,20 @@ def url_detail(id):
 @app.route('/urls/<int:id>/checks', methods=['POST'])
 def add_check(id):
     url_data = get_url_by_id(id)
-        
+
     if not url_data:
         flash('Запись не найдена.', 'error')
         return redirect(url_for('urls'))
-        
+
     try:
         response = requests.get(url_data['name'])
-        response.raise_for_status()  
+        response.raise_for_status()
         status_code = response.status_code
         session['last_status_code'] = status_code
     except RequestException:
         flash("Произошла ошибка при проверке", 'error')
         return redirect(url_for('url_detail', id=id))
-    
+
     page_data = extract_page_data(response)
 
     insert_into_url_checks(id, page_data)
