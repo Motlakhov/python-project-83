@@ -74,7 +74,6 @@ def show_urls():
     return render_template('urls.html', urls=urls_list)
 
 
-
 @app.get('/urls/<int:id>')
 def run_check(id):
     url_data = db.get_url_by_id(id)
@@ -120,6 +119,7 @@ def add_check(id):
 
     flash('Страница успешно проверена', 'success'), status_code
     return redirect(url_for('run_check', id=id))
+
 
 # Обработка ошибки 404 (страница не найдена)
 @app.errorhandler(404)
