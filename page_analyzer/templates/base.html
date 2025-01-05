@@ -19,15 +19,15 @@
     </nav>
   </header>
 
-  <main class="flex-grow-1">
-    <div class="container-lg mt-3">
-      <h1>{% block heading %}{% endblock %}</h1>
-
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
       <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }}" role="alert">{{ message }}</div>
     {% endfor %}
   {% endwith %}
+
+  <main class="flex-grow-1">
+    <div class="container-lg mt-3">
+      <h1>{% block heading %}{% endblock %}</h1>
 
   {% block content %}
   {% endblock %}
