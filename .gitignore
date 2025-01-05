@@ -1,4 +1,4 @@
-__pycache__
+page_analyzer/__pycache__
 dist/
 .venv/
 .pytest_cache/
@@ -10,3 +10,5 @@ coverage.xml
 test-coverage-tool
 htmlcov/
 .env
+__pycache__
+page_analyzer/python-project-83

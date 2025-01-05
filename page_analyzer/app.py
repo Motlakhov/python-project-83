@@ -3,12 +3,10 @@ import requests
 from datetime import datetime
 from page_analyzer.utils import normalize_url, validate_url
 from page_analyzer.page_checker import extract_page_data
-from page_analyzer.db import (get_url_by_name, insert_into_urls,
-                              get_all_urls, get_url_by_id,
-                              get_checks_for_url, insert_into_url_checks)
+import page_analyzer.db as db
 from dotenv import load_dotenv
 from flask import (Flask, flash, get_flashed_messages, redirect,
-                   render_template, request, session, url_for)
+                   render_template, request, url_for)
 from requests import RequestException
 
 
@@ -20,14 +18,14 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['DATABASE_URL'] = os.getenv('DATABASE_URL')
 
 
-@app.route('/', methods=['GET'])
+@app.get('/')
 def index():
     return render_template('index.html')
 
 
-@app.route('/urls', methods=['POST'])
-def post_index():
-    url = request.form.get('url')
+@app.post('/urls')
+def add_url():
+    url = request.form['url']
 
     normalized_url = normalize_url(url)
 
@@ -45,32 +43,18 @@ def post_index():
 
     # Проверка существования URL в базе данных
 
-    existing_url = get_url_by_name(normalized_url)
+    existing_url = db.get_url_by_name(normalized_url)
     if existing_url:
         flash('Страница уже существует', 'info')
-        return redirect(url_for('url_detail', id=existing_url['id']))
+        return redirect(url_for('run_check', id=existing_url['id']))
     else:
-        new_site_id = insert_into_urls(normalized_url, datetime.now())
+        new_site_id = db.insert_into_urls(normalized_url, datetime.now())
         flash('Страница успешно добавлена', 'success')
-        return redirect(url_for('url_detail', id=new_site_id))
+        return redirect(url_for('run_check', id=new_site_id))
 
 
-# Обработка ошибки 404 (страница не найдена)
-@app.errorhandler(404)
-def page_not_found(error):
-    flash('Запрошенная страница не найдена.', 'error')
-    return render_template('index.html'), 404
-
-
-# Обработка ошибки 500 (внутренняя ошибка сервера)
-@app.errorhandler(500)
-def internal_server_error(error):
-    flash('На сервере произошла ошибка. Попробуйте позже.', 'error')
-    return render_template('index.html'), 500
-
-
-@app.route('/urls', methods=['GET'])
-def urls():
+@app.get('/urls')
+def show_urls():
 
     messages = get_flashed_messages(with_categories=True)
     show_error_message = any(category == 'error' for category, _ in messages)
@@ -78,7 +62,7 @@ def urls():
     if show_error_message:
         return render_template('index.html')
 
-    urls = get_all_urls()
+    urls = db.get_all_urls()
 
     # Конвертируем полученный словарь в список
     urls_list = []
@@ -90,16 +74,17 @@ def urls():
     return render_template('urls.html', urls=urls_list)
 
 
-@app.route('/urls/<int:id>', methods=['GET'])
-def url_detail(id):
-    url_data = get_url_by_id(id)
+
+@app.get('/urls/<int:id>')
+def run_check(id):
+    url_data = db.get_url_by_id(id)
 
     if not url_data:
         flash('Запись не найдена.', 'error')
-        return redirect(url_for('urls'))
+        return redirect(url_for('show_urls'))
 
     # Получаем список проверок для данного URL
-    checks = get_checks_for_url(id)
+    checks = db.get_checks_for_url(id)
 
     for check in checks:
         check['created_at_formatted'] = \
@@ -113,29 +98,41 @@ def url_detail(id):
     return render_template('url_detail.html', url=url_data, checks=checks)
 
 
-@app.route('/urls/<int:id>/checks', methods=['POST'])
+@app.post('/urls/<int:id>/checks')
 def add_check(id):
-    url_data = get_url_by_id(id)
+    url_data = db.get_url_by_id(id)
 
     if not url_data:
         flash('Запись не найдена.', 'error')
-        return redirect(url_for('urls'))
+        return redirect(url_for('show_urls'))
 
     try:
         response = requests.get(url_data['name'])
         response.raise_for_status()
         status_code = response.status_code
-        session['last_status_code'] = status_code
     except RequestException:
         flash("Произошла ошибка при проверке", 'error')
-        return redirect(url_for('url_detail', id=id))
+        return redirect(url_for('run_check', id=id))
 
     page_data = extract_page_data(response)
 
-    insert_into_url_checks(id, page_data)
+    db.insert_into_url_checks(id, page_data)
 
-    flash('Страница успешно проверена', 'success')
-    return redirect(url_for('url_detail', id=id))
+    flash('Страница успешно проверена', 'success'), status_code
+    return redirect(url_for('run_check', id=id))
+
+# Обработка ошибки 404 (страница не найдена)
+@app.errorhandler(404)
+def page_not_found(error):
+    flash('Запрошенная страница не найдена.', 'error')
+    return render_template('index.html'), 404
+
+
+# Обработка ошибки 500 (внутренняя ошибка сервера)
+@app.errorhandler(500)
+def internal_server_error(error):
+    flash('На сервере произошла ошибка. Попробуйте позже.', 'error')
+    return render_template('index.html'), 500
 
 
 if __name__ == '__main__':

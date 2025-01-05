@@ -5,6 +5,9 @@ from validators.url import url as url_validator
 def normalize_url(input_url):
     parsed_url = urlparse(input_url)
 
+    if not parsed_url.hostname:
+        return ''
+
     normalized_scheme = parsed_url.scheme.lower()
     normalized_host = parsed_url.hostname.lower()
 
